@@ -5,96 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Economist Feed</title>
     <style>
-        body {
-            background-color: #fafafa;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        .feed-container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .card {
-            background: white;
-            border: 1px solid #dbdbdb;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            overflow: hidden;
-        }
-        .card-header {
-            padding: 16px;
-            font-weight: bold;
-        }
-        .card-image {
-            width: 100%;
-            display: block;
-        }
-        .card-content {
-            padding: 16px;
-        }
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #262626;
-            text-decoration: none;
-            display: block;
-        }
-        .card-description {
-            font-size: 14px;
-            color: #484848;
-            line-height: 1.4;
-        }
-        .read-more {
-            margin-top: 10px;
-            display: inline-block;
-            color: #0095f6;
-            text-decoration: none;
-            font-weight: bold;
-        }
+        body { background-color: #fafafa; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; }
+        .feed-container { max-width: 600px; margin: 0 auto; }
+        .card { background: white; border: 1px solid #dbdbdb; border-radius: 8px; margin-bottom: 30px; overflow: hidden; }
+        .card-content { padding: 16px; }
+        .card-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #262626; text-decoration: none; display: block; }
+        .card-description { font-size: 14px; color: #484848; line-height: 1.4; }
+        .read-more { margin-top: 10px; display: inline-block; color: #0095f6; text-decoration: none; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="feed-container" id="feed">
-        <h2 style="text-align: center;">Loading The Economist...</h2>
+        <h2 style="text-align: center;">Loading the latest articles...</h2>
     </div>
 
     <script>
-        // RSS feed URL
         const rssUrl = "https://www.economist.com/sections/main/rss.xml";
-        // We use rss2json to bypass CORS issues
-        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        // Use allorigins.win as a reliable proxy to bypass CORS
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
 
-        fetch(apiUrl)
+        fetch(proxyUrl)
             .then(response => response.json())
             .then(data => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+                const items = xmlDoc.querySelectorAll("item");
                 const feedContainer = document.getElementById('feed');
-                feedContainer.innerHTML = ''; // Clear loading text
+                
+                feedContainer.innerHTML = ''; // Clear loading
 
-                data.items.forEach(item => {
-                    // Create card element
+                items.forEach(item => {
+                    const title = item.querySelector("title").textContent;
+                    const link = item.querySelector("link").textContent;
+                    const description = item.querySelector("description").textContent;
+
                     const card = document.createElement('div');
                     card.className = 'card';
-
-                    // Extract image (RSS feeds sometimes have it in 'enclosure' or 'thumbnail')
-                    const img = item.enclosure.link || item.thumbnail || '';
-                    
                     card.innerHTML = `
-                        ${img ? `<img src="${img}" class="card-image" alt="Article image">` : ''}
                         <div class="card-content">
-                            <a href="${item.link}" target="_blank" class="card-title">${item.title}</a>
-                            <div class="card-description">${item.description}</div>
-                            <a href="${item.link}" target="_blank" class="read-more">Read Full Article</a>
+                            <a href="${link}" target="_blank" class="card-title">${title}</a>
+                            <div class="card-description">${description}</div>
+                            <a href="${link}" target="_blank" class="read-more">Read Full Article</a>
                         </div>
                     `;
                     feedContainer.appendChild(card);
                 });
             })
             .catch(error => {
-                console.error('Error fetching feed:', error);
-                document.getElementById('feed').innerHTML = '<p>Failed to load feed. Please check your connection or CORS policy.</p>';
+                console.error('Error:', error);
+                document.getElementById('feed').innerHTML = '<p>Something went wrong. Try refreshing in a few minutes.</p>';
             });
     </script>
 </body>
