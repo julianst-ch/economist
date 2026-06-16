@@ -56,11 +56,15 @@
                 const data = await response.json();
                 
                 stories = data.items.map(item => {
-                    // Extract image from HTML description
                     const div = document.createElement('div');
                     div.innerHTML = item.description;
                     const img = div.querySelector('img');
-                    const imgUrl = img ? img.src : '';
+                    
+                    // Proxy the image URL if it exists
+                    let imgUrl = '';
+                    if (img && img.src) {
+                        imgUrl = `https://images.weserv.nl/?url=${encodeURIComponent(img.src)}`;
+                    }
 
                     return {
                         title: item.title,
@@ -96,7 +100,6 @@
             document.getElementById('description').innerText = story.description;
             document.getElementById('read-btn').href = story.link;
             
-            // Set Background
             const container = document.getElementById('story-container');
             if(story.image) {
                 container.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.95), transparent), url('${story.image}')`;
