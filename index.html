@@ -11,15 +11,13 @@
         #story-container { 
             width: 100vw; height: 100vh; position: relative; display: flex; flex-direction: column; justify-content: flex-end; color: var(--text-white);
             background-size: cover; background-position: center; transition: background-image 0.5s ease;
-            background-color: var(--economist-red); /* Fallback */
+            background-color: var(--economist-red);
         }
         
-        /* Progress Bar */
         #progress-container { position: absolute; top: 15px; left: 10px; right: 10px; display: flex; gap: 5px; z-index: 10; }
         .progress-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--text-white); width: 0%; }
 
-        /* Text Content */
         #content-area { padding: 40px; padding-bottom: 100px; background: linear-gradient(to top, rgba(0,0,0,0.95), transparent); }
         h1 { font-size: 2rem; margin-bottom: 15px; line-height: 1.2; }
         p { font-size: 1.1rem; opacity: 0.9; line-height: 1.6; }
@@ -49,7 +47,6 @@
         const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
         let stories = [];
         let currentIndex = 0;
-        let startTime;
         let animationFrame;
         const DURATION = 8000;
 
@@ -59,22 +56,24 @@
                 const data = await response.json();
                 
                 stories = data.items.map(item => {
-                    // Try several sources for the image
-                    const img = item.enclosure?.link || 
-                                (item.thumbnail) || 
-                                "";
+                    // Extract image from HTML description
+                    const div = document.createElement('div');
+                    div.innerHTML = item.description;
+                    const img = div.querySelector('img');
+                    const imgUrl = img ? img.src : '';
+
                     return {
                         title: item.title,
                         description: item.description.replace(/<[^>]*>?/gm, '').substring(0, 150) + "...",
                         link: item.link,
-                        image: img
+                        image: imgUrl
                     };
                 }).slice(0, 5);
                 
                 initProgressBars();
                 showStory(0);
             } catch (e) {
-                document.getElementById('title').innerText = "Failed to load feed.";
+                document.getElementById('title').innerText = "Error loading data.";
             }
         }
 
@@ -102,32 +101,26 @@
             if(story.image) {
                 container.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.95), transparent), url('${story.image}')`;
             } else {
-                container.style.backgroundImage = 'none'; // Fallback to red
+                container.style.backgroundImage = 'none';
             }
             
-            // Reset all bars
             document.querySelectorAll('.progress-fill').forEach((f, i) => {
                 f.style.width = i < index ? '100%' : '0%';
             });
             
-            startTime = performance.now();
-            animateProgress(index);
-        }
-
-        function animateProgress(index) {
-            const fill = document.getElementById(`fill-${index}`);
-            const update = (now) => {
-                const elapsed = now - startTime;
-                const progress = Math.min((elapsed / DURATION) * 100, 100);
-                fill.style.width = `${progress}%`;
+            let start = null;
+            function animate(timestamp) {
+                if (!start) start = timestamp;
+                const progress = Math.min((timestamp - start) / DURATION, 1) * 100;
+                document.getElementById(`fill-${index}`).style.width = `${progress}%`;
                 
                 if (progress < 100) {
-                    animationFrame = requestAnimationFrame(update);
+                    animationFrame = requestAnimationFrame(animate);
                 } else if (currentIndex < stories.length - 1) {
                     showStory(currentIndex + 1);
                 }
-            };
-            animationFrame = requestAnimationFrame(update);
+            }
+            animationFrame = requestAnimationFrame(animate);
         }
 
         document.getElementById('nav-left').onclick = () => { if(currentIndex > 0) showStory(currentIndex - 1); };
