@@ -50,34 +50,37 @@
 
     <script>
         const RSS_URL = 'https://www.economist.com/business/rss.xml';
-        const PROXY = 'https://api.allorigins.win/get?url=';
+        // Using rss2json API
+        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+        
         let stories = [];
         let currentIndex = 0;
         let timer;
-        const DURATION = 8000; // 8 seconds per story
+        const DURATION = 8000;
 
         async function fetchRSS() {
             try {
-                const response = await fetch(PROXY + encodeURIComponent(RSS_URL));
+                const response = await fetch(API_URL);
                 const data = await response.json();
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(data.contents, "text/xml");
-                const items = xml.querySelectorAll("item");
                 
-                stories = Array.from(items).slice(0, 5).map(item => ({
-                    title: item.querySelector("title").textContent,
-                    description: item.querySelector("description")?.textContent.replace(/<[^>]*>?/gm, '').substring(0, 150) + "...",
-                    link: item.querySelector("link").textContent
-                }));
-                
-                initStories();
+                if (data.status === 'ok') {
+                    stories = data.items.slice(0, 5).map(item => ({
+                        title: item.title,
+                        description: item.description.replace(/<[^>]*>?/gm, '').substring(0, 150) + "...",
+                        link: item.link
+                    }));
+                    initStories();
+                } else {
+                    throw new Error("RSS load failed");
+                }
             } catch (e) {
-                document.getElementById('title').innerText = "Error loading feed. CORS or RSS limit reached.";
+                document.getElementById('title').innerText = "Unable to load feed. Check API status.";
             }
         }
 
         function initStories() {
             const container = document.getElementById('progress-container');
+            container.innerHTML = ''; // Clear previous
             stories.forEach((_, i) => {
                 const bar = document.createElement('div');
                 bar.className = 'progress-bar';
@@ -93,7 +96,6 @@
             document.getElementById('description').innerText = stories[index].description;
             document.getElementById('read-btn').href = stories[index].link;
             
-            // Reset progress
             document.querySelectorAll('.progress-fill').forEach(f => f.style.width = '0%');
             
             if (timer) clearTimeout(timer);
