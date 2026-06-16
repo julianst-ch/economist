@@ -7,54 +7,54 @@
     <style>
         body { background-color: #fafafa; font-family: -apple-system, sans-serif; margin: 0; padding: 20px; }
         .feed-container { max-width: 600px; margin: 0 auto; }
-        .card { background: white; border: 1px solid #dbdbdb; border-radius: 8px; margin-bottom: 30px; overflow: hidden; }
-        .card-content { padding: 16px; }
-        .card-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #262626; text-decoration: none; display: block; }
-        .card-description { font-size: 14px; color: #484848; line-height: 1.4; }
-        .read-more { margin-top: 10px; display: inline-block; color: #0095f6; text-decoration: none; font-weight: bold; }
+        .card { background: white; border: 1px solid #dbdbdb; border-radius: 8px; margin-bottom: 30px; overflow: hidden; padding: 15px; }
+        .error { color: red; background: #fff0f0; padding: 20px; border-radius: 8px; border: 1px solid red; }
     </style>
 </head>
 <body>
 
     <div class="feed-container" id="feed">
-        <h2 style="text-align: center;">Loading the latest articles...</h2>
+        <h2 id="status">Connecting to proxy...</h2>
     </div>
 
     <script>
+        const statusEl = document.getElementById('status');
         const rssUrl = "https://www.economist.com/sections/main/rss.xml";
-        // Use allorigins.win as a reliable proxy to bypass CORS
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`;
 
         fetch(proxyUrl)
-            .then(response => response.json())
-            .then(data => {
+            .then(response => {
+                if (!response.ok) throw new Error('HTTP error ' + response.status);
+                return response.text();
+            })
+            .then(str => {
                 const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
-                const items = xmlDoc.querySelectorAll("item");
-                const feedContainer = document.getElementById('feed');
+                const xml = parser.parseFromString(str, "text/xml");
+                const items = xml.querySelectorAll("item");
                 
-                feedContainer.innerHTML = ''; // Clear loading
+                if (items.length === 0) {
+                    throw new Error("No items found in feed. The feed might be empty or formatted incorrectly.");
+                }
+
+                const feedContainer = document.getElementById('feed');
+                feedContainer.innerHTML = ''; 
 
                 items.forEach(item => {
-                    const title = item.querySelector("title").textContent;
-                    const link = item.querySelector("link").textContent;
-                    const description = item.querySelector("description").textContent;
+                    const title = item.querySelector("title")?.textContent || "No Title";
+                    const link = item.querySelector("link")?.textContent || "#";
+                    const description = item.querySelector("description")?.textContent || "";
 
                     const card = document.createElement('div');
                     card.className = 'card';
                     card.innerHTML = `
-                        <div class="card-content">
-                            <a href="${link}" target="_blank" class="card-title">${title}</a>
-                            <div class="card-description">${description}</div>
-                            <a href="${link}" target="_blank" class="read-more">Read Full Article</a>
-                        </div>
+                        <h3><a href="${link}" target="_blank">${title}</a></h3>
+                        <p>${description}</p>
                     `;
                     feedContainer.appendChild(card);
                 });
             })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('feed').innerHTML = '<p>Something went wrong. Try refreshing in a few minutes.</p>';
+            .catch(err => {
+                statusEl.innerHTML = `<div class="error"><strong>Error:</strong> ${err.message}<br><br>Please copy this message and send it to me.</div>`;
             });
     </script>
 </body>
