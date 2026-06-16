@@ -13,7 +13,10 @@
 
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--background); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
         
-        #story-container { width: 100vw; height: 100vh; position: relative; display: flex; flex-direction: column; justify-content: flex-end; color: var(--text-white); }
+        #story-container { 
+            width: 100vw; height: 100vh; position: relative; display: flex; flex-direction: column; justify-content: flex-end; color: var(--text-white);
+            background-size: cover; background-position: center; transition: background-image 0.5s ease;
+        }
         
         /* Progress Bar */
         #progress-container { position: absolute; top: 15px; left: 10px; right: 10px; display: flex; gap: 5px; z-index: 10; }
@@ -50,7 +53,6 @@
 
     <script>
         const RSS_URL = 'https://www.economist.com/business/rss.xml';
-        // Using rss2json API
         const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
         
         let stories = [];
@@ -67,20 +69,21 @@
                     stories = data.items.slice(0, 5).map(item => ({
                         title: item.title,
                         description: item.description.replace(/<[^>]*>?/gm, '').substring(0, 150) + "...",
-                        link: item.link
+                        link: item.link,
+                        image: item.enclosure?.link || item.thumbnail || '' 
                     }));
                     initStories();
                 } else {
-                    throw new Error("RSS load failed");
+                    document.getElementById('title').innerText = "Unable to load feed.";
                 }
             } catch (e) {
-                document.getElementById('title').innerText = "Unable to load feed. Check API status.";
+                document.getElementById('title').innerText = "Error loading feed.";
             }
         }
 
         function initStories() {
             const container = document.getElementById('progress-container');
-            container.innerHTML = ''; // Clear previous
+            container.innerHTML = ''; 
             stories.forEach((_, i) => {
                 const bar = document.createElement('div');
                 bar.className = 'progress-bar';
@@ -92,9 +95,16 @@
 
         function showStory(index) {
             currentIndex = index;
-            document.getElementById('title').innerText = stories[index].title;
-            document.getElementById('description').innerText = stories[index].description;
-            document.getElementById('read-btn').href = stories[index].link;
+            const story = stories[index];
+            
+            // Update Text
+            document.getElementById('title').innerText = story.title;
+            document.getElementById('description').innerText = story.description;
+            document.getElementById('read-btn').href = story.link;
+            
+            // Update Background Image
+            const container = document.getElementById('story-container');
+            container.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.95), transparent), url('${story.image}')`;
             
             document.querySelectorAll('.progress-fill').forEach(f => f.style.width = '0%');
             
