@@ -5,33 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Economist Feed</title>
     <style>
-        :root {
-            --economist-red: #e3120b;
-            --background: #000;
-            --text-white: #ffffff;
-        }
-
+        :root { --economist-red: #e3120b; --background: #000; --text-white: #ffffff; }
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--background); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
         
         #story-container { 
             width: 100vw; height: 100vh; position: relative; display: flex; flex-direction: column; justify-content: flex-end; color: var(--text-white);
             background-size: cover; background-position: center; transition: background-image 0.5s ease;
+            background-color: var(--economist-red); /* Fallback */
         }
         
         /* Progress Bar */
         #progress-container { position: absolute; top: 15px; left: 10px; right: 10px; display: flex; gap: 5px; z-index: 10; }
-        .progress-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; }
+        .progress-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--text-white); width: 0%; }
 
         /* Text Content */
-        #content-area { padding: 40px; padding-bottom: 100px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); }
+        #content-area { padding: 40px; padding-bottom: 100px; background: linear-gradient(to top, rgba(0,0,0,0.95), transparent); }
         h1 { font-size: 2rem; margin-bottom: 15px; line-height: 1.2; }
         p { font-size: 1.1rem; opacity: 0.9; line-height: 1.6; }
-
-        /* Button */
         #read-btn { display: inline-block; margin-top: 20px; padding: 12px 25px; border: 1px solid var(--text-white); color: var(--text-white); text-decoration: none; font-weight: bold; cursor: pointer; }
         
-        /* Click Regions */
         .nav-zone { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 5; }
         #nav-left { left: 0; cursor: w-resize; }
         #nav-right { right: 0; cursor: e-resize; }
@@ -54,10 +47,10 @@
     <script>
         const RSS_URL = 'https://www.economist.com/business/rss.xml';
         const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
-        
         let stories = [];
         let currentIndex = 0;
-        let timer;
+        let startTime;
+        let animationFrame;
         const DURATION = 8000;
 
         async function fetchRSS() {
@@ -65,63 +58,76 @@
                 const response = await fetch(API_URL);
                 const data = await response.json();
                 
-                if (data.status === 'ok') {
-                    stories = data.items.slice(0, 5).map(item => ({
+                stories = data.items.map(item => {
+                    // Try several sources for the image
+                    const img = item.enclosure?.link || 
+                                (item.thumbnail) || 
+                                "";
+                    return {
                         title: item.title,
                         description: item.description.replace(/<[^>]*>?/gm, '').substring(0, 150) + "...",
                         link: item.link,
-                        image: item.enclosure?.link || item.thumbnail || '' 
-                    }));
-                    initStories();
-                } else {
-                    document.getElementById('title').innerText = "Unable to load feed.";
-                }
+                        image: img
+                    };
+                }).slice(0, 5);
+                
+                initProgressBars();
+                showStory(0);
             } catch (e) {
-                document.getElementById('title').innerText = "Error loading feed.";
+                document.getElementById('title').innerText = "Failed to load feed.";
             }
         }
 
-        function initStories() {
+        function initProgressBars() {
             const container = document.getElementById('progress-container');
-            container.innerHTML = ''; 
             stories.forEach((_, i) => {
                 const bar = document.createElement('div');
                 bar.className = 'progress-bar';
                 bar.innerHTML = `<div class="progress-fill" id="fill-${i}"></div>`;
                 container.appendChild(bar);
             });
-            showStory(0);
         }
 
         function showStory(index) {
+            cancelAnimationFrame(animationFrame);
             currentIndex = index;
             const story = stories[index];
             
-            // Update Text
             document.getElementById('title').innerText = story.title;
             document.getElementById('description').innerText = story.description;
             document.getElementById('read-btn').href = story.link;
             
-            // Update Background Image
+            // Set Background
             const container = document.getElementById('story-container');
-            container.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.95), transparent), url('${story.image}')`;
+            if(story.image) {
+                container.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.95), transparent), url('${story.image}')`;
+            } else {
+                container.style.backgroundImage = 'none'; // Fallback to red
+            }
             
-            document.querySelectorAll('.progress-fill').forEach(f => f.style.width = '0%');
+            // Reset all bars
+            document.querySelectorAll('.progress-fill').forEach((f, i) => {
+                f.style.width = i < index ? '100%' : '0%';
+            });
             
-            if (timer) clearTimeout(timer);
+            startTime = performance.now();
             animateProgress(index);
         }
 
         function animateProgress(index) {
             const fill = document.getElementById(`fill-${index}`);
-            fill.style.transition = `width ${DURATION}ms linear`;
-            fill.style.width = '100%';
-            
-            timer = setTimeout(() => {
-                if (currentIndex < stories.length - 1) {
+            const update = (now) => {
+                const elapsed = now - startTime;
+                const progress = Math.min((elapsed / DURATION) * 100, 100);
+                fill.style.width = `${progress}%`;
+                
+                if (progress < 100) {
+                    animationFrame = requestAnimationFrame(update);
+                } else if (currentIndex < stories.length - 1) {
                     showStory(currentIndex + 1);
                 }
-            }, DURATION);
+            };
+            animationFrame = requestAnimationFrame(update);
         }
 
         document.getElementById('nav-left').onclick = () => { if(currentIndex > 0) showStory(currentIndex - 1); };
